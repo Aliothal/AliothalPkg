@@ -180,18 +180,17 @@ VOID EFIAPI Udp4ReceiveHandler(IN EFI_EVENT  Event,  IN VOID *Context)
     return;
   UINT32 BufferIndex = 0;
   
-  lv_snprintf(fragment_buf, 2048, "%d.%d.%d.%d[%d]->%d.%d.%d.%d[%d]:\n", RxData->UdpSession.SourceAddress.Addr[0],
+  lv_debug(NULL, "%d.%d.%d.%d[%d]->%d.%d.%d.%d[%d]:\n", RxData->UdpSession.SourceAddress.Addr[0],
     RxData->UdpSession.SourceAddress.Addr[1],RxData->UdpSession.SourceAddress.Addr[2],RxData->UdpSession.SourceAddress.Addr[3],
     RxData->UdpSession.SourcePort, RxData->UdpSession.DestinationAddress.Addr[0],RxData->UdpSession.DestinationAddress.Addr[1],
     RxData->UdpSession.DestinationAddress.Addr[2],RxData->UdpSession.DestinationAddress.Addr[3],RxData->UdpSession.DestinationPort);
-  lv_textarea_add_text(ui.data.ta_data_log, fragment_buf);
   for (UINT32 Index = 0; Index < RxData->FragmentCount; Index++) {
     CopyMem(fragment_buf + BufferIndex, RxData->FragmentTable[Index].FragmentBuffer, RxData->FragmentTable[Index].FragmentLength);
     BufferIndex += RxData->FragmentTable[Index].FragmentLength;
   }
   fragment_buf[RxData->DataLength] = '\n';
   fragment_buf[RxData->DataLength+1] = '\0';
-  lv_textarea_add_text(ui.data.ta_data_log, fragment_buf);
+  lv_debug(NULL, fragment_buf);
   
   gBS->SignalEvent(RxData->RecycleSignal);
   Socket->Udp4->Receive(Socket->Udp4, &Socket->TokenReceive);
