@@ -273,8 +273,6 @@ static void mouse_read(lv_indev_t * indev_drv, lv_indev_data_t * data)
 /*Return true is the mouse button is pressed*/
 static bool mouse_is_pressed(void)
 {
-    if (SpState.LeftButton && SpState.RightButton)
-        lv_efi_app_exit();
     return SpState.LeftButton | SpState.RightButton;
 }
 

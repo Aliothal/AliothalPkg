@@ -69,6 +69,14 @@ static UDP4_SOCKET *gSocketReceive = NULL;
 static UDP4_SOCKET *gSocketTransmit = NULL;
 static char fragment_buf[2048];
 
+static void lv_debug(const char* format, ...){
+  VA_LIST va;
+  VA_START(va, format);
+  AsciiSPrint(fragment_buf, 2048, format, va);
+  VA_END(va);
+  lv_textarea_add_text(ui.data.ta_data_log, fragment_buf);
+}
+
 static void event_close(lv_event_t * e)
 {
   lv_point_t point;
@@ -92,6 +100,7 @@ static void show_usage(lv_timer_t * t)
 
 static void send_event(lv_event_t * e)
 {
+  EFI_STATUS Status = 0;
   lv_point_t point;
   lv_indev_get_point(lv_event_get_indev(e), &point);
   if (lv_obj_hit_test(lv_event_get_target_obj(e), &point)) {
@@ -112,15 +121,15 @@ static void send_event(lv_event_t * e)
     }
     gSocketTransmit->ConfigData.RemoteAddress = ip4_remote;
     gSocketTransmit->ConfigData.RemotePort = (UINT16)port_remote;
-    gSocketTransmit->Udp4->Configure(gSocketTransmit->Udp4, NULL);
-    gSocketTransmit->Udp4->Configure(gSocketTransmit->Udp4, &gSocketTransmit->ConfigData);
+    Status = gSocketTransmit->Udp4->Configure(gSocketTransmit->Udp4, NULL);
+    Status = gSocketTransmit->Udp4->Configure(gSocketTransmit->Udp4, &gSocketTransmit->ConfigData);
     EFI_UDP4_TRANSMIT_DATA *TxData = gSocketTransmit->TokenTransmit.Packet.TxData;
     ZeroMem(TxData, sizeof(EFI_UDP4_TRANSMIT_DATA));
     TxData->DataLength = send_len;
     TxData->FragmentCount = 1;
     TxData->FragmentTable[0].FragmentLength = send_len;
     TxData->FragmentTable[0].FragmentBuffer = (void *)send_data;
-    gSocketTransmit->Udp4->Transmit(gSocketTransmit->Udp4, &gSocketTransmit->TokenTransmit);
+    Status = gSocketTransmit->Udp4->Transmit(gSocketTransmit->Udp4, &gSocketTransmit->TokenTransmit);
     lv_textarea_set_text(ui.data.ctrl.ta_send, "");
   }
 }
@@ -217,14 +226,13 @@ EFI_STATUS UdpInit(void)
     };
 
     Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4ReceiveHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketReceive);
-    if (!EFI_ERROR (Status)) {
-        gSocketReceive->Udp4->Receive(gSocketReceive->Udp4, &gSocketReceive->TokenReceive);
-    }
-    *(UINT32 *)mConfigData.StationAddress.Addr = (192 | 168 << 8 | 101 << 16 | 17 << 24);
+    lv_debug("%r \n", Status);
+    *(UINT32 *)mConfigData.StationAddress.Addr = (192 | 168 << 8 | 1 << 16 | 20 << 24);
     *(UINT32 *)mConfigData.SubnetMask.Addr = (255 | 255 << 8 | 255 << 16 | 0 << 24);
-    *(UINT32 *)mConfigData.RemoteAddress.Addr = (192 | 168 << 8 | 101 << 16 | 189 << 24);
+    *(UINT32 *)mConfigData.RemoteAddress.Addr = (192 | 168 << 8 | 1 << 16 | 10 << 24);
     mConfigData.RemotePort = mConfigData.StationPort;
     Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4NullHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketTransmit);
+    lv_debug("%r \n", Status);
     return Status;
 }
 
@@ -280,7 +288,7 @@ void lv_efi_app_main(void)
   ui.setting.net.ta_port = lv_textarea_create(ui.setting.net.this);
   ui.setting.net.sw = lv_switch_create(ui.setting.net.this);
   lv_obj_add_event_cb(ui.setting.net.sw, switch_event, LV_EVENT_VALUE_CHANGED, NULL);
-  lv_textarea_set_text(ui.setting.net.ta_ip, "192.168.101.17");
+  lv_textarea_set_text(ui.setting.net.ta_ip, "192.168.1.20");
   lv_textarea_set_text(ui.setting.net.ta_port, "5566");
 
   lv_label_set_text(ui.setting.net.lb_title, "Network setting");
@@ -356,7 +364,7 @@ void lv_efi_app_main(void)
   lv_textarea_set_accepted_chars(ui.data.conf.ta_re_ip, "0123456789.");
   lv_textarea_set_one_line(ui.data.conf.ta_re_ip, true);
   lv_textarea_set_max_length(ui.data.conf.ta_re_ip, 15);
-  lv_textarea_set_text(ui.data.conf.ta_re_ip, "192.168.101.189");
+  lv_textarea_set_text(ui.data.conf.ta_re_ip, "192.168.1.10");
 
   ui.data.conf.lb_re_port = lv_label_create(ui.data.conf.this);
   lv_label_set_text(ui.data.conf.lb_re_port, "  Remote port:");
