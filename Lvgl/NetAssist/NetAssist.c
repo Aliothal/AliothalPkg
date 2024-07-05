@@ -1,5 +1,7 @@
 #include "../lvgl.h"
 
+#include <Protocol/Ip4Config2.h>
+
 #include <Library/Udp4SocketLib.h>
 #include <Library/NetLib.h>
 
@@ -164,6 +166,12 @@ static void send_event(lv_event_t * e)
   }
 }
 
+static EFI_STATUS lv_set_ip(EFI_IPv4_ADDRESS ip4)
+{
+  // EFI_IP4_CONFIG2_POLICY          Policy;
+  // EFI_IP4_CONFIG2_MANUAL_ADDRESS  ManualAddress;
+}
+
 static void switch_event(lv_event_t * e)
 {
   EFI_STATUS Status = 0;
@@ -185,17 +193,14 @@ static void switch_event(lv_event_t * e)
     if (port_station > 0xFFFF) {
       return;
     }
+    lv_set_ip(ip4_station);
     switch (lv_dropdown_get_selected(ui.setting.net.dd_type)) {
       case 0:   //Udp
         gSocketTransmit->ConfigData.StationAddress = ip4_station;
         gSocketTransmit->ConfigData.StationPort = (UINT16)port_station;
         gSocketReceive->ConfigData.StationPort = (UINT16)port_station;
-        CHAR16 TempBuf[128];
-        UnicodeSPrintAsciiFormat(TempBuf, 128, "ifconfig -s eth0 static %a 255.255.255.0 %d.%d.%d.1",
-        ip4_station_str, ip4_station.Addr[0], ip4_station.Addr[1], ip4_station.Addr[2]);
+        
         Status = gSocketReceive->Udp4->Configure(gSocketReceive->Udp4, NULL);
-        ShellExecute(&gImageHandle, TempBuf, FALSE, NULL, &Status);
-        lv_refr_now(NULL);
         Status = gSocketReceive->Udp4->Configure(gSocketReceive->Udp4, &gSocketReceive->ConfigData);
         Status = gSocketReceive->Udp4->Receive(gSocketReceive->Udp4, &gSocketReceive->TokenReceive);
         break;
