@@ -67,17 +67,18 @@ typedef struct {
 lv_ui ui;
 static UDP4_SOCKET *gSocketReceive = NULL;
 static UDP4_SOCKET *gSocketTransmit = NULL;
+static char debug_buf[2048];
 static char fragment_buf[2048];
 
 static void lv_debug(lv_obj_t *ta, const char* format, ...){
   VA_LIST va;
   VA_START(va, format);
-  AsciiVSPrint(fragment_buf, 2048, format, va);
+  AsciiVSPrint(debug_buf, 2048, format, va);
   VA_END(va);
   if (ta == NULL) {
     ta = ui.data.ta_data_log;
   }
-  lv_textarea_add_text(ta, fragment_buf);
+  lv_textarea_add_text(ta, debug_buf);
 }
 
 static void event_close(lv_event_t * e)
@@ -180,7 +181,7 @@ VOID EFIAPI Udp4ReceiveHandler(IN EFI_EVENT  Event,  IN VOID *Context)
     return;
   UINT32 BufferIndex = 0;
   
-  lv_debug(NULL, "%d.%d.%d.%d[%d]->%d.%d.%d.%d[%d]:\n", RxData->UdpSession.SourceAddress.Addr[0],
+  lv_debug(NULL, "%d.%d.%d.%d[%d]->%d.%d.%d.%d[%d]:\n\0", RxData->UdpSession.SourceAddress.Addr[0],
     RxData->UdpSession.SourceAddress.Addr[1],RxData->UdpSession.SourceAddress.Addr[2],RxData->UdpSession.SourceAddress.Addr[3],
     RxData->UdpSession.SourcePort, RxData->UdpSession.DestinationAddress.Addr[0],RxData->UdpSession.DestinationAddress.Addr[1],
     RxData->UdpSession.DestinationAddress.Addr[2],RxData->UdpSession.DestinationAddress.Addr[3],RxData->UdpSession.DestinationPort);
@@ -190,6 +191,7 @@ VOID EFIAPI Udp4ReceiveHandler(IN EFI_EVENT  Event,  IN VOID *Context)
   }
   fragment_buf[RxData->DataLength] = '\n';
   fragment_buf[RxData->DataLength+1] = '\0';
+  lv_debug(NULL, "%x\n", fragment_buf[0]);
   lv_debug(NULL, fragment_buf);
   
   gBS->SignalEvent(RxData->RecycleSignal);
@@ -224,7 +226,7 @@ EFI_STATUS UdpInit(void)
     };
 
     Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4ReceiveHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketReceive);
-    lv_debug(NULL, "%r \n", Status);
+    lv_debug(NULL, "%r \n\0", Status);
     *(UINT32 *)mConfigData.StationAddress.Addr = (192 | 168 << 8 | 1 << 16 | 20 << 24);
     *(UINT32 *)mConfigData.SubnetMask.Addr = (255 | 255 << 8 | 255 << 16 | 0 << 24);
     *(UINT32 *)mConfigData.RemoteAddress.Addr = (192 | 168 << 8 | 1 << 16 | 10 << 24);
