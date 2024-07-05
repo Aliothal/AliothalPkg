@@ -69,12 +69,15 @@ static UDP4_SOCKET *gSocketReceive = NULL;
 static UDP4_SOCKET *gSocketTransmit = NULL;
 static char fragment_buf[2048];
 
-static void lv_debug(const char* format, ...){
+static void lv_debug(lv_obj_t *ta, const char* format, ...){
   VA_LIST va;
   VA_START(va, format);
-  AsciiSPrint(fragment_buf, 2048, format, va);
+  AsciiVSPrint(fragment_buf, 2048, format, va);
   VA_END(va);
-  lv_textarea_add_text(ui.data.ta_data_log, fragment_buf);
+  if (ta == NULL) {
+    ta = ui.data.ta_data_log;
+  }
+  lv_textarea_add_text(ta, fragment_buf);
 }
 
 static void event_close(lv_event_t * e)
@@ -137,11 +140,10 @@ static void send_event(lv_event_t * e)
 static void switch_event(lv_event_t * e)
 {
   EFI_STATUS Status = 0;
-  
+  if (gSocketReceive == NULL) {
+    return;
+  }
   if (lv_obj_has_state(ui.setting.net.sw, LV_STATE_CHECKED)) {
-    if (gSocketReceive == NULL) {
-      return;
-    }
     EFI_IPv4_ADDRESS ip4_station;
     UINTN port_station;
     const char *ip4_station_str = lv_textarea_get_text(ui.setting.net.ta_ip);
@@ -165,9 +167,6 @@ static void switch_event(lv_event_t * e)
         break;
     }
   } else {
-    if (gSocketReceive == NULL) {
-      return;
-    }
     gSocketReceive->Udp4->Cancel(gSocketReceive->Udp4, NULL);
     gSocketTransmit->Udp4->Cancel(gSocketTransmit->Udp4, NULL);
   }
@@ -177,7 +176,7 @@ VOID EFIAPI Udp4ReceiveHandler(IN EFI_EVENT  Event,  IN VOID *Context)
 {
   UDP4_SOCKET                 *Socket = Context;
   EFI_UDP4_RECEIVE_DATA       *RxData = Socket->TokenReceive.Packet.RxData;
-  if (Socket->TokenReceive.Status == EFI_ABORTED || RxData->DataLength == 0 || gSocketTransmit == NULL)
+  if (Socket->TokenReceive.Status == EFI_ABORTED || RxData->DataLength == 0)
     return;
   UINT32 BufferIndex = 0;
   
@@ -226,13 +225,13 @@ EFI_STATUS UdpInit(void)
     };
 
     Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4ReceiveHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketReceive);
-    lv_debug("%r \n", Status);
+    lv_debug(NULL, "%r \n", Status);
     *(UINT32 *)mConfigData.StationAddress.Addr = (192 | 168 << 8 | 1 << 16 | 20 << 24);
     *(UINT32 *)mConfigData.SubnetMask.Addr = (255 | 255 << 8 | 255 << 16 | 0 << 24);
     *(UINT32 *)mConfigData.RemoteAddress.Addr = (192 | 168 << 8 | 1 << 16 | 10 << 24);
     mConfigData.RemotePort = mConfigData.StationPort;
     Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4NullHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketTransmit);
-    lv_debug("%r \n", Status);
+    lv_debug(NULL, "%r \n", Status);
     return Status;
 }
 
