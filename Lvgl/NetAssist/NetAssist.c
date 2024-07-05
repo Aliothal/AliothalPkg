@@ -69,6 +69,10 @@ static UDP4_SOCKET *gSocketReceive = NULL;
 static UDP4_SOCKET *gSocketTransmit = NULL;
 static char debug_buf[2048];
 static char fragment_buf[2048];
+const char *ip4_station_str;
+const char *port_station_str;
+const char *ip4_remote_str;
+const char *port_remote_str;
 
 static void lv_debug(lv_obj_t *ta, const char* format, ...){
   VA_LIST va;
@@ -102,20 +106,41 @@ static void show_usage(lv_timer_t * t)
   lv_label_set_text_fmt(ui.time, "Time: %4d.%2d.%2d:%2d.%2d.%2d", time.Year, time.Month, time.Day, time.Hour, time.Minute, time.Second);
 }
 
+static void clr_send_event(lv_event_t * e)
+{
+  lv_point_t point;
+  lv_indev_get_point(lv_event_get_indev(e), &point);
+  if (lv_obj_hit_test(lv_event_get_target_obj(e), &point)) {
+    lv_textarea_set_text(ui.data.ctrl.ta_send, "");
+  }
+}
+
+static void clr_log_event(lv_event_t * e)
+{
+  lv_point_t point;
+  lv_indev_get_point(lv_event_get_indev(e), &point);
+  if (lv_obj_hit_test(lv_event_get_target_obj(e), &point)) {
+    lv_textarea_set_text(ui.data.ta_data_log, "");
+  }
+}
+
 static void send_event(lv_event_t * e)
 {
   EFI_STATUS Status = 0;
   lv_point_t point;
+  if (gSocketTransmit == NULL || !lv_obj_has_state(ui.setting.net.sw, LV_STATE_CHECKED))
+    return;
   lv_indev_get_point(lv_event_get_indev(e), &point);
   if (lv_obj_hit_test(lv_event_get_target_obj(e), &point)) {
     const char *send_data = lv_textarea_get_text(ui.data.ctrl.ta_send);
+    lv_strncpy(fragment_buf, send_data, 2048);        //@note: necessary
     UINTN send_len = lv_strlen(send_data);
     if (send_len == 0)
       return;
     EFI_IPv4_ADDRESS ip4_remote;
     UINTN port_remote;
-    const char *ip4_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_ip);
-    const char *port_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_port);
+    ip4_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_ip);
+    port_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_port);
     if (!NetLibAsciiStrToIp4(ip4_remote_str, &ip4_remote) == 0) {
       return;
     }
@@ -132,9 +157,10 @@ static void send_event(lv_event_t * e)
     TxData->DataLength = send_len;
     TxData->FragmentCount = 1;
     TxData->FragmentTable[0].FragmentLength = send_len;
-    TxData->FragmentTable[0].FragmentBuffer = (void *)send_data;
-    Status = gSocketTransmit->Udp4->Transmit(gSocketTransmit->Udp4, &gSocketTransmit->TokenTransmit);
-    lv_textarea_set_text(ui.data.ctrl.ta_send, "");
+    TxData->FragmentTable[0].FragmentBuffer = (void *)fragment_buf;
+    Status = gSocketTransmit->Udp4->Transmit(gSocketTransmit->Udp4, &gSocketTransmit->TokenTransmit);         //@note: not block
+    lv_textarea_set_text(ui.data.ctrl.ta_send, "");                                                           //@note: may clean send_data before transmission is down
+    lv_debug(NULL, "%a\n", fragment_buf);
   }
 }
 
@@ -145,10 +171,13 @@ static void switch_event(lv_event_t * e)
     return;
   }
   if (lv_obj_has_state(ui.setting.net.sw, LV_STATE_CHECKED)) {
+    lv_obj_add_state(ui.setting.net.dd_type, LV_STATE_DISABLED);
+    lv_obj_add_state(ui.setting.net.ta_ip, LV_STATE_DISABLED);
+    lv_obj_add_state(ui.setting.net.ta_port, LV_STATE_DISABLED);
     EFI_IPv4_ADDRESS ip4_station;
     UINTN port_station;
-    const char *ip4_station_str = lv_textarea_get_text(ui.setting.net.ta_ip);
-    const char *port_station_str = lv_textarea_get_text(ui.setting.net.ta_port);
+    ip4_station_str = lv_textarea_get_text(ui.setting.net.ta_ip);
+    port_station_str = lv_textarea_get_text(ui.setting.net.ta_port);
     if (!NetLibAsciiStrToIp4(ip4_station_str, &ip4_station) == 0) {
       return;
     }
@@ -161,13 +190,20 @@ static void switch_event(lv_event_t * e)
         gSocketTransmit->ConfigData.StationAddress = ip4_station;
         gSocketTransmit->ConfigData.StationPort = (UINT16)port_station;
         gSocketReceive->ConfigData.StationPort = (UINT16)port_station;
-
+        CHAR16 TempBuf[128];
+        UnicodeSPrintAsciiFormat(TempBuf, 128, "ifconfig -s eth0 static %a 255.255.255.0 %d.%d.%d.1",
+        ip4_station_str, ip4_station.Addr[0], ip4_station.Addr[1], ip4_station.Addr[2]);
         Status = gSocketReceive->Udp4->Configure(gSocketReceive->Udp4, NULL);
+        ShellExecute(&gImageHandle, TempBuf, FALSE, NULL, &Status);
+        lv_refr_now(NULL);
         Status = gSocketReceive->Udp4->Configure(gSocketReceive->Udp4, &gSocketReceive->ConfigData);
         Status = gSocketReceive->Udp4->Receive(gSocketReceive->Udp4, &gSocketReceive->TokenReceive);
         break;
     }
   } else {
+    lv_obj_remove_state(ui.setting.net.dd_type, LV_STATE_DISABLED);
+    lv_obj_remove_state(ui.setting.net.ta_ip, LV_STATE_DISABLED);
+    lv_obj_remove_state(ui.setting.net.ta_port, LV_STATE_DISABLED);
     gSocketReceive->Udp4->Cancel(gSocketReceive->Udp4, NULL);
     gSocketTransmit->Udp4->Cancel(gSocketTransmit->Udp4, NULL);
   }
@@ -181,18 +217,12 @@ VOID EFIAPI Udp4ReceiveHandler(IN EFI_EVENT  Event,  IN VOID *Context)
     return;
   UINT32 BufferIndex = 0;
   
-  lv_debug(NULL, "%d.%d.%d.%d[%d]->%d.%d.%d.%d[%d]:\n\0", RxData->UdpSession.SourceAddress.Addr[0],
-    RxData->UdpSession.SourceAddress.Addr[1],RxData->UdpSession.SourceAddress.Addr[2],RxData->UdpSession.SourceAddress.Addr[3],
-    RxData->UdpSession.SourcePort, RxData->UdpSession.DestinationAddress.Addr[0],RxData->UdpSession.DestinationAddress.Addr[1],
-    RxData->UdpSession.DestinationAddress.Addr[2],RxData->UdpSession.DestinationAddress.Addr[3],RxData->UdpSession.DestinationPort);
   for (UINT32 Index = 0; Index < RxData->FragmentCount; Index++) {
     CopyMem(fragment_buf + BufferIndex, RxData->FragmentTable[Index].FragmentBuffer, RxData->FragmentTable[Index].FragmentLength);
     BufferIndex += RxData->FragmentTable[Index].FragmentLength;
   }
-  fragment_buf[RxData->DataLength] = '\n';
-  fragment_buf[RxData->DataLength+1] = '\0';
-  lv_debug(NULL, "%x\n", fragment_buf[0]);
-  lv_debug(NULL, fragment_buf);
+  fragment_buf[RxData->DataLength] = '\0';
+  lv_debug(NULL, "%a\n", fragment_buf);
   
   gBS->SignalEvent(RxData->RecycleSignal);
   Socket->Udp4->Receive(Socket->Udp4, &Socket->TokenReceive);
@@ -226,13 +256,12 @@ EFI_STATUS UdpInit(void)
     };
 
     Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4ReceiveHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketReceive);
-    lv_debug(NULL, "%r \n\0", Status);
     *(UINT32 *)mConfigData.StationAddress.Addr = (192 | 168 << 8 | 1 << 16 | 20 << 24);
     *(UINT32 *)mConfigData.SubnetMask.Addr = (255 | 255 << 8 | 255 << 16 | 0 << 24);
     *(UINT32 *)mConfigData.RemoteAddress.Addr = (192 | 168 << 8 | 1 << 16 | 10 << 24);
     mConfigData.RemotePort = mConfigData.StationPort;
     Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4NullHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketTransmit);
-    lv_debug(NULL, "%r \n", Status);
+
     return Status;
 }
 
@@ -381,10 +410,12 @@ void lv_efi_app_main(void)
   lv_obj_add_style(ui.data.conf.btn_clr_send, &ui.btn_cls_clicked, LV_STATE_PRESSED);
   ui.data.conf.lb_clr_send = lv_label_create(ui.data.conf.btn_clr_send);
   lv_label_set_text(ui.data.conf.lb_clr_send, "  clear send");
+  lv_obj_add_event_cb(ui.data.conf.btn_clr_send, clr_send_event, LV_EVENT_RELEASED, NULL);
   ui.data.conf.btn_clr_log = lv_button_create(ui.data.conf.this);
   lv_obj_add_style(ui.data.conf.btn_clr_log, &ui.btn_cls_clicked, LV_STATE_PRESSED);
   ui.data.conf.lb_clr_log = lv_label_create(ui.data.conf.btn_clr_log);
   lv_label_set_text(ui.data.conf.lb_clr_log, "  clear log");
+  lv_obj_add_event_cb(ui.data.conf.btn_clr_log, clr_log_event, LV_EVENT_RELEASED, NULL);
 
   ui.data.ctrl.this = lv_obj_create(ui.data.this);
   lv_obj_set_flex_flow(ui.data.ctrl.this, LV_FLEX_FLOW_ROW);

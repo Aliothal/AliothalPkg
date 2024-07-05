@@ -19,8 +19,7 @@ GraphicsOutputTestEntryPoint (
   )
 {
   EFI_STATUS    Status = EFI_SUCCESS;
-  EFI_IPv4_ADDRESS ip4;
-  Status = NetLibAsciiStrToIp4("192.168.1.1", &ip4);
-  Print(L"Status:%r,ip4:%d.%d.%d.%d\n",Status, ip4.Addr[0],ip4.Addr[1],ip4.Addr[2],ip4.Addr[3]);
-  return EFI_SUCCESS;
+  Status = ShellExecute(&gImageHandle, L"ifconfig -s eth0 static 192.168.1.50 255.255.255.0 192.168.1.1", FALSE, NULL, &Status);
+  Print(L"%r\n", Status);
+  return Status;
 }
