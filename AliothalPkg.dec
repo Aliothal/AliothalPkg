@@ -1,0 +1,11 @@
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = AliothalPkg
+  PACKAGE_GUID                   = 7067850a-a618-462a-84c9-0be3a7b23540
+  PACKAGE_VERSION                = 0.01
+
+[Includes]
+  Include
+  Library
+  
+[LibraryClasses]

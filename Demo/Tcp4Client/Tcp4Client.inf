@@ -1,0 +1,30 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = Tcp4Client
+  FILE_GUID                      = 03685A84-FDA1-68EF-7B6C-928B861202EE
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = Tcp4ClientEntryPoint
+
+[Sources]
+  Tcp4Client.c
+
+[Packages]
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  UefiApplicationEntryPoint
+
+[Protocols]
+  gEfiTcp4ServiceBindingProtocolGuid
+  gEfiTcp4ProtocolGuid

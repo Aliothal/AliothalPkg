@@ -1,0 +1,31 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = DumpBootLogo
+  FILE_GUID                      = 6B531E2D-09A3-544B-AC58-19B08B5FE75B
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = DumpBootLogoEntryPoint
+
+[Sources]
+  DumpBootLogo.c
+
+[Packages]
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  UefiApplicationEntryPoint
+  BmpSupportLib
+
+[Guids]
+  gEfiAcpiTableGuid
+  

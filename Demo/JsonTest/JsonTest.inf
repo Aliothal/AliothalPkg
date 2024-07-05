@@ -1,0 +1,32 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = JsonTest
+  FILE_GUID                      = 5E5F6BAD-DA07-86CF-24A5-136EE98ED5A2
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = EntryPoint
+
+[Sources]
+  JsonTest.c
+
+[Packages]
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  AliothalPkg/AliothalPkg.dec
+  CryptoPkg/CryptoPkg.dec
+
+[LibraryClasses]
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  UefiApplicationEntryPoint
+  FileHandleLib
+  PrintLib
+  cJSONLib
+  BaseCryptLib

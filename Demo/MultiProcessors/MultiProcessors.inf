@@ -1,0 +1,30 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = MultiProcessors
+  FILE_GUID                      = 5B0BC9B0-A81E-2F8F-F819-85EA8CCFD723
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = MultiProcessorsEntryPoint
+
+[Sources]
+  MultiProcessors.c
+
+[Packages]
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  UefiApplicationEntryPoint
+  SynchronizationLib
+
+[Protocols]
+  gEfiMpServiceProtocolGuid

@@ -1,0 +1,35 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = NetStackTest
+  FILE_GUID                      = bc0f0f23-893d-43d5-96d4-c1adc06b1cdc
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = NetStackTestEntryPoint
+
+[Sources]
+  NetStackTest.c
+
+[Packages]
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  PrintLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  UefiApplicationEntryPoint
+
+[Guids]
+  gEfiSmbiosTableGuid
+
+[Protocols]
+  gEfiNetworkInterfaceIdentifierProtocolGuid_31
+  gEfiSimpleNetworkProtocolGuid
+  

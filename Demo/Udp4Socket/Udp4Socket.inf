@@ -1,0 +1,32 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = Udp4Socket
+  FILE_GUID                      = 33C67751-AF2D-816C-41FC-A9F151965D31
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = Udp4SocketEntryPoint
+
+[Sources]
+  Udp4Socket.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  AliothalPkg/AliothalPkg.dec
+
+[LibraryClasses]
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  Udp4SocketLib
+  UefiApplicationEntryPoint
+  PrintLib
+  cJSONLib
+
+[Protocols]
+  gEfiUdp4ServiceBindingProtocolGuid
+  gEfiUdp4ProtocolGuid
+  gEfiIp4Config2ProtocolGuid

@@ -1,0 +1,56 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = Test
+  FILE_GUID                      = a938d727-775b-4736-b71e-b0d281c87f65
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = ShellCEntryLib
+
+[Sources]
+  Test.c
+
+[Packages]
+  StdLib/StdLib.dec
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  AliothalPkg/AliothalPkg.dec
+
+[LibraryClasses]
+  LibC
+  LibStdio
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  SmbusLib
+  HiiLib
+  DevicePathLib
+  BmpSupportLib
+  IoLib
+  PciLib
+  TimeBaseLib
+  DevShell
+
+[Protocols]
+  gEfiTcp4ServiceBindingProtocolGuid
+  gEfiTcp4ProtocolGuid
+  gEfiUdp4ServiceBindingProtocolGuid
+  gEfiUdp4ProtocolGuid
+  gEfiHiiImageExProtocolGuid
+  gEfiHiiImageProtocolGuid
+  gEfiHiiPackageListProtocolGuid
+  gEfiHiiDatabaseProtocolGuid
+  gEfiLoadedImageProtocolGuid
+  gEfiHiiImageDecoderProtocolGuid
+  
+[Guids]
+  gEfiSmbiosTableGuid
+  gEfiAcpiTableGuid
+  gEfiHiiImageDecoderNameJpegGuid
+  gEfiHiiImageDecoderNamePngGuid

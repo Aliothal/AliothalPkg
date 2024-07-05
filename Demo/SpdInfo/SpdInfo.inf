@@ -1,0 +1,34 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = SpdInfo
+  FILE_GUID                      = f1309215-49ce-4fab-8691-3f88296bd907
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = SpdInfoEntryPoint
+
+[Sources]
+  Utils.c
+  SpdInfo.c
+
+[Packages]
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  SmbusLib
+  UefiApplicationEntryPoint
+  PciLib
+  IoLib
+  ShellCommandLib
+
+[Guids]
+  gEfiSmbiosTableGuid

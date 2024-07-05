@@ -1,0 +1,30 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = PerfMonitor
+  FILE_GUID                      = EA530880-9BD4-6A07-1061-21FD63487F3B
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = ShellCEntryLib
+
+[Sources]
+  PerfMonitor.c
+
+[Packages]
+  StdLib/StdLib.dec
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  PrintLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  CpuLib
+  LibC
+  LibStdio

@@ -1,0 +1,28 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = cJSONLib
+  FILE_GUID                      = 3CE54A13-83F7-48A9-A7BD-57C11EE86AF1
+  MODULE_TYPE                    = BASE
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = cJSONLib|UEFI_APPLICATION
+
+[Sources]
+  cJSON.c
+
+[Packages]
+  # ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  AliothalPkg/AliothalPkg.dec
+
+[LibraryClasses]
+  # ShellLib
+  # ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  # FileHandleLib
+  PrintLib

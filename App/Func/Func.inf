@@ -1,0 +1,35 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = Func
+  FILE_GUID                      = 51E621F2-8036-242E-CDBB-B11FA66209FC
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = FuncEntryPoint
+
+[Sources]
+  src/Cursor.h
+  src/Cursor.c
+  src/Screen.h
+  src/Screen.c
+  
+  Func.c
+
+[Packages]
+  ShellPkg/ShellPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  ShellLib
+  ShellCommandLib
+  DebugLib
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  UefiApplicationEntryPoint
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
+  gEfiSimplePointerProtocolGuid
