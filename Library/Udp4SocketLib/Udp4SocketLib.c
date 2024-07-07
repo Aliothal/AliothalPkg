@@ -6,7 +6,12 @@ static CHAR8 StartOfBuffer[MAX_UDP4_FRAGMENT_LENGTH];
 EFI_STATUS EFIAPI CreateUdp4Socket(EFI_UDP4_CONFIG_DATA *ConfigData, EFI_EVENT_NOTIFY NotifyReceive, EFI_EVENT_NOTIFY NotifyTransmit, UDP4_SOCKET **Socket)
 {
   if (ConfigData == NULL || NotifyReceive == NULL || NotifyTransmit == NULL || Socket == NULL) {
+    *Socket = NULL;
     return EFI_INVALID_PARAMETER;
+  }
+  if (Udp4Service == NULL) {
+    *Socket = NULL;
+    return EFI_UNSUPPORTED;
   }
   EFI_STATUS  Status = 0;
   *Socket = AllocateZeroPool(sizeof(UDP4_SOCKET));

@@ -22,9 +22,6 @@
 #include "my_include.h"
 #endif
 
-#define MY_DISP_HOR_RES  1920
-#define MY_DISP_VER_RES  1080
-
 /*====================
    COLOR SETTINGS
  *====================*/

@@ -55,6 +55,7 @@ main(
 
   gBS->CloseEvent(TickEvent);
   gBS->CloseEvent(ExitEvent);
+  lv_port_disp_deinit();
   lv_deinit();
   gST->ConOut->ClearScreen(gST->ConOut);
 

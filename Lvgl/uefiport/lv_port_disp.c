@@ -31,6 +31,9 @@ static void disp_flush(lv_display_t * disp, const lv_area_t * area, uint8_t * px
  *  STATIC VARIABLES
  **********************/
 static EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop = NULL;
+static lv_color_t *buf_2_1;
+static lv_color_t *buf_2_2;
+
 /**********************
  *      MACROS
  **********************/
@@ -38,6 +41,8 @@ static EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop = NULL;
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+int32_t lv_disp_hor_res = 0;
+int32_t lv_disp_ver_res = 0;
 
 void lv_port_disp_init(void)
 {
@@ -49,32 +54,36 @@ void lv_port_disp_init(void)
     /*------------------------------------
      * Create a display and set a flush_cb
      * -----------------------------------*/
-    lv_display_t * disp = lv_display_create(MY_DISP_HOR_RES, MY_DISP_VER_RES);
+    lv_display_t * disp = lv_display_create(lv_disp_hor_res, lv_disp_ver_res);
     lv_display_set_flush_cb(disp, disp_flush);
 
     /* Example 1
      * One buffer for partial rendering*/
-    // static lv_color_t buf_1_1[MY_DISP_HOR_RES * 10];                          /*A buffer for 10 rows*/
+    // static lv_color_t buf_1_1[lv_disp_hor_res * 10];                          /*A buffer for 10 rows*/
     // lv_display_set_buffers(disp, buf_1_1, NULL, sizeof(buf_1_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
 
     /* Example 2
      * Two buffers for partial rendering
      * In flush_cb DMA or similar hardware should be used to update the display in the background.*/
-    static lv_color_t buf_2_1[MY_DISP_HOR_RES * 10];
-    static lv_color_t buf_2_2[MY_DISP_HOR_RES * 10];
-    lv_display_set_buffers(disp, buf_2_1, buf_2_2, sizeof(buf_2_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    // static lv_color_t buf_2_1[lv_disp_hor_res * 10];
+    // static lv_color_t buf_2_2[lv_disp_hor_res * 10];
+    buf_2_1 = AllocatePool(lv_disp_hor_res * 10);
+    buf_2_2 = AllocatePool(lv_disp_hor_res * 10);
+    lv_display_set_buffers(disp, buf_2_1, buf_2_2, lv_disp_hor_res * 10, LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_default(disp);
     /* Example 3
      * Two buffers screen sized buffer for double buffering.
      * Both LV_DISPLAY_RENDER_MODE_DIRECT and LV_DISPLAY_RENDER_MODE_FULL works, see their comments*/
-    // static lv_color_t buf_3_1[MY_DISP_HOR_RES * MY_DISP_VER_RES];
-    // static lv_color_t buf_3_2[MY_DISP_HOR_RES * MY_DISP_VER_RES];
+    // static lv_color_t buf_3_1[lv_disp_hor_res * lv_disp_ver_res];
+    // static lv_color_t buf_3_2[lv_disp_hor_res * lv_disp_ver_res];
     // lv_display_set_buffers(disp, buf_3_1, buf_3_2, sizeof(buf_3_1), LV_DISPLAY_RENDER_MODE_DIRECT);
 
 }
 
 void lv_port_disp_deinit(void)
 {
+    FreePool(buf_2_1);
+    FreePool(buf_2_2);
     lv_display_delete(lv_display_get_default());
 }
 
@@ -85,32 +94,28 @@ void lv_port_disp_deinit(void)
 /*Initialize your display and the required peripherals.*/
 static void disp_init(void)
 {
-    gBS->HandleProtocol(gST->ConsoleOutHandle, &gEfiGraphicsOutputProtocolGuid, (void **)&Gop);
-    if (Gop == NULL)
-        gBS->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (void **)&Gop);
+    EFI_STATUS Status = 0;
+    Status = gBS->HandleProtocol(gST->ConsoleOutHandle, &gEfiGraphicsOutputProtocolGuid, (void **)&Gop);
+    if (Status != 0)
+        Status = gBS->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (void **)&Gop);
+
     UINTN       SizeOfInfo = 0;
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION  *Info = NULL;
-    UINT32 i = 0;
-    UINTN Columns = 0, Rows = 0;
-    for (i = 0; i < gST->ConOut->Mode->MaxMode; i++) {
-        gST->ConOut->QueryMode(gST->ConOut, i, &Columns, &Rows);
-        if (Columns == 240 && Rows == 56) {
-            gST->ConOut->SetMode(gST->ConOut, i);
-            break;
-        }
-    }
-    for (i = 0; i < Gop->Mode->MaxMode; i++) {
+    UINT32      Best = 0;
+
+    for (UINT32 i = 0; i < Gop->Mode->MaxMode; i++) {
         Gop->QueryMode(Gop, i, &SizeOfInfo, &Info);
-        if ((Info->HorizontalResolution == MY_DISP_HOR_RES) && (Info->VerticalResolution == MY_DISP_VER_RES)) {
-            Gop->SetMode(Gop, i);
-            break;
+        if (Info->HorizontalResolution > lv_disp_hor_res) {
+            lv_disp_hor_res = Info->HorizontalResolution;
+            lv_disp_ver_res = Info->VerticalResolution;
+            Best = i;
         }
+        // if ((Info->HorizontalResolution == lv_disp_hor_res) && (Info->VerticalResolution == lv_disp_ver_res)) {
+        //     Gop->SetMode(Gop, i);
+        //     break;
+        // }
     }
-    if (i == Gop->Mode->MaxMode) {
-        AsciiPrint("%d * %d is not support!!!\n", MY_DISP_HOR_RES, MY_DISP_VER_RES);
-        gBS->Stall(10000000);
-        lv_efi_app_exit();
-    }
+    Gop->SetMode(Gop, Best);
 }
 
 volatile bool disp_flush_enabled = true;

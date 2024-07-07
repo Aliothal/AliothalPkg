@@ -49,6 +49,8 @@ static bool button_is_pressed(uint8_t id);
 /**********************
  *  STATIC VARIABLES
  **********************/
+extern int32_t lv_disp_hor_res, lv_disp_ver_res;
+
 lv_indev_t * indev_touchpad;
 lv_indev_t * indev_mouse;
 lv_indev_t * indev_keypad;
@@ -62,8 +64,8 @@ static lv_indev_state_t encoder_state;
 static EFI_SIMPLE_POINTER_PROTOCOL *Spp = NULL;
 static EFI_SIMPLE_POINTER_STATE SpState;
 static UINT8 ScaleX = 0, ScaleY = 0;
-static INT32 PositionX = (MY_DISP_HOR_RES >> 1);
-static INT32 PositionY = (MY_DISP_VER_RES >> 1);
+static INT32 PositionX = 0;
+static INT32 PositionY = 0;
 
 static EFI_SIMPLE_TEXT_INPUT_PROTOCOL *Stip = NULL;
 /**********************
@@ -242,6 +244,8 @@ static void touchpad_get_xy(int32_t * x, int32_t * y)
 static void mouse_init(void)
 {
     gBS->HandleProtocol(gST->ConsoleInHandle, &gEfiSimplePointerProtocolGuid, &Spp);
+    if (Spp == NULL)
+        gBS->LocateProtocol(&gEfiSimplePointerProtocolGuid, NULL, (void **)&Spp);
     UINT64 ResolutionX = Spp->Mode->ResolutionX;
     UINT64 ResolutionY = Spp->Mode->ResolutionY;
 
@@ -253,6 +257,8 @@ static void mouse_init(void)
         ResolutionY >>= 1;
         ScaleY++;
     }
+    PositionX = (lv_disp_hor_res >> 1);
+    PositionY = (lv_disp_ver_res >> 1);
 }
 
 /*Will be called by the library to read the mouse*/
@@ -286,12 +292,12 @@ static void mouse_get_xy(int32_t * x, int32_t * y)
         SpState = CurSpState;
         PositionX += (SpState.RelativeMovementX >> (ScaleX - 3));
         PositionY += (SpState.RelativeMovementY >> (ScaleY - 3));
-        if (PositionX > (MY_DISP_HOR_RES - 1))
-            PositionX = (MY_DISP_HOR_RES - 1);
+        if (PositionX > (lv_disp_hor_res - 1))
+            PositionX = (lv_disp_hor_res - 1);
         else if (PositionX < 0)
             PositionX = 0;
-        if (PositionY > (MY_DISP_VER_RES - 1))
-            PositionY = (MY_DISP_VER_RES - 1);
+        if (PositionY > (lv_disp_ver_res - 1))
+            PositionY = (lv_disp_ver_res - 1);
         else if (PositionY < 0)
             PositionY = 0;
     }

@@ -92,8 +92,10 @@ static void event_close(lv_event_t * e)
   lv_point_t point;
   lv_indev_get_point(lv_event_get_indev(e), &point);
   if (lv_obj_hit_test(lv_event_get_target_obj(e), &point)) {
-    CloseUdp4Socket(gSocketReceive);
-    CloseUdp4Socket(gSocketTransmit);
+    if (gSocketReceive)
+      CloseUdp4Socket(gSocketReceive);
+    if (gSocketTransmit)
+      CloseUdp4Socket(gSocketTransmit);
     lv_timer_delete(ui.usage_timer);
     lv_obj_delete(ui.win_main);
     lv_efi_app_exit();
@@ -175,7 +177,7 @@ static EFI_STATUS lv_set_ip(EFI_IPv4_ADDRESS ip4)
 static void switch_event(lv_event_t * e)
 {
   EFI_STATUS Status = 0;
-  if (gSocketReceive == NULL) {
+  if (gSocketReceive == NULL || gSocketTransmit == NULL) {
     return;
   }
   if (lv_obj_has_state(ui.setting.net.sw, LV_STATE_CHECKED)) {
@@ -296,7 +298,6 @@ void lv_efi_app_main(void)
   lv_obj_add_event_cb(ui.btn_cls, event_close, LV_EVENT_RELEASED, NULL);
   ui.content = lv_win_get_content(ui.win_main);
   lv_obj_set_flex_flow(ui.content, LV_FLEX_FLOW_ROW);
-
 
   ui.setting.this = lv_obj_create(ui.content);
   static lv_style_t style_title;
@@ -424,7 +425,7 @@ void lv_efi_app_main(void)
 
   ui.data.ctrl.this = lv_obj_create(ui.data.this);
   lv_obj_set_flex_flow(ui.data.ctrl.this, LV_FLEX_FLOW_ROW);
-  lv_obj_set_size(ui.data.ctrl.this,LV_PCT(100), 340);
+  lv_obj_set_size(ui.data.ctrl.this,LV_PCT(100), LV_PCT(30));
   lv_obj_set_style_border_width(ui.data.ctrl.this, 1, 0);
   lv_obj_set_style_border_color(ui.data.ctrl.this, lv_color_make(120,120,120), 0);
 
@@ -441,6 +442,5 @@ void lv_efi_app_main(void)
   lv_label_set_text(ui.data.ctrl.lb_send, "send");
   ui.lb_author = lv_label_create(ui.data.this);
   lv_label_set_text(ui.lb_author, "author: aliothal Yan | address: su zhou");
-
   UdpInit();
 }
