@@ -57,13 +57,12 @@ typedef struct {
   lv_obj_t *time;
   lv_timer_t *usage_timer;
 	lv_obj_t *btn_cls;
-  lv_style_t win_default;
-  lv_style_t btn_cls_focused;
+  lv_obj_t *content;
+  lv_obj_t *lb_author;
   lv_style_t btn_cls_clicked;
-	lv_obj_t *content;
+
   area_setting setting;
   area_data data;
-  lv_obj_t *lb_author;
 } lv_ui;
 
 lv_ui ui;
@@ -117,7 +116,7 @@ static void show_usage(lv_timer_t * t)
   EFI_TIME time;
   gRT->GetTime(&time, NULL);
   lv_label_set_text_fmt(ui.usage, "Usage: %3d%%", (100 - lv_timer_get_idle()));
-  lv_label_set_text_fmt(ui.time, "Time: %4d.%2d.%2d:%2d.%2d.%2d", time.Year, time.Month, time.Day, time.Hour, time.Minute, time.Second);
+  lv_label_set_text_fmt(ui.time, "Time: %4d/%2d/%2d-%2d:%2d:%2d", time.Year, time.Month, time.Day, time.Hour, time.Minute, time.Second);
 }
 
 static void clr_send_event(lv_event_t * e)
@@ -536,17 +535,12 @@ void lv_efi_app_main(void)
   ui.header = lv_win_get_header(ui.win_main);
   ui.usage = lv_label_create(ui.header);
   ui.time = lv_label_create(ui.header);
-  // lv_obj_align(ui.usage, LV_ALIGN_CENTER, 0, 0);
+
   ui.usage_timer = lv_timer_create(show_usage, 500, NULL);
   lv_timer_ready(ui.usage_timer);
   ui.btn_cls = lv_win_add_button(ui.win_main, LV_SYMBOL_CLOSE, 45);
-  lv_style_init(&ui.win_default);
-  lv_style_init(&ui.btn_cls_focused);
   lv_style_init(&ui.btn_cls_clicked);
-  lv_style_set_bg_color(&ui.btn_cls_focused, lv_color_make(232, 17, 35));
   lv_style_set_bg_color(&ui.btn_cls_clicked, lv_color_make(241, 112, 122));
-  // lv_obj_add_style(ui.win_main, &ui.win_default, LV_STATE_DEFAULT);
-  // lv_obj_add_style(ui.btn_cls, &ui.btn_cls_focused, LV_STATE_FOCUSED);
   lv_obj_add_style(ui.btn_cls, &ui.btn_cls_clicked, LV_STATE_PRESSED);
   lv_obj_remove_state(ui.btn_cls, LV_STATE_FOCUSED);
   lv_obj_add_event_cb(ui.btn_cls, event_close, LV_EVENT_RELEASED, NULL);
