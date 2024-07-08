@@ -168,10 +168,226 @@ static void send_event(lv_event_t * e)
   }
 }
 
+VOID
+EFIAPI
+IfConfigManualAddressNotify (
+  IN EFI_EVENT  Event,
+  IN VOID       *Context
+  )
+{
+  *((BOOLEAN *)Context) = TRUE;
+}
+
 static EFI_STATUS lv_set_ip(EFI_IPv4_ADDRESS ip4)
 {
-  // EFI_IP4_CONFIG2_POLICY          Policy;
-  // EFI_IP4_CONFIG2_MANUAL_ADDRESS  ManualAddress;
+  EFI_STATUS                      Status = 0;
+  UINTN                           HandleIndex;
+  UINTN                           HandleNum;
+  EFI_HANDLE                      *HandleBuffer;
+  EFI_IP4_CONFIG2_PROTOCOL        *Ip4Cfg2;
+  EFI_IP4_CONFIG2_INTERFACE_INFO  *IfInfo;
+  EFI_IP4_CONFIG2_POLICY          Policy;
+  EFI_IPv4_ADDRESS                Gateway;
+  EFI_IP4_CONFIG2_MANUAL_ADDRESS  ManualAddress;
+  UINTN                           DataSize;
+  EFI_EVENT              TimeOutEvt;
+  EFI_EVENT              MappedEvt;
+  BOOLEAN                IsAddressOk;
+
+  HandleBuffer = NULL;
+  HandleNum    = 0;
+  IfInfo = NULL;
+
+  Status = gBS->LocateHandleBuffer (
+                  ByProtocol,
+                  &gEfiIp4ServiceBindingProtocolGuid,
+                  NULL,
+                  &HandleNum,
+                  &HandleBuffer
+                  );
+  if (EFI_ERROR (Status) || (HandleNum == 0)) {
+    return Status;
+  }
+
+  for (HandleIndex = 0; HandleIndex < HandleNum; HandleIndex++) {
+    IfInfo   = NULL;
+    DataSize = 0;
+    ASSERT (HandleBuffer != NULL);
+    Status = gBS->HandleProtocol (
+                    HandleBuffer[HandleIndex],
+                    &gEfiIp4Config2ProtocolGuid,
+                    (VOID **)&Ip4Cfg2
+                    );
+
+    if (EFI_ERROR (Status)) {
+      goto ON_ERROR;
+    }
+    Status = Ip4Cfg2->GetData (
+                        Ip4Cfg2,
+                        Ip4Config2DataTypeInterfaceInfo,
+                        &DataSize,
+                        NULL
+                        );
+
+    if (Status != EFI_BUFFER_TOO_SMALL) {
+      goto ON_ERROR;
+    }
+
+    IfInfo = AllocateZeroPool (DataSize);
+
+    if (IfInfo == NULL) {
+      Status = EFI_OUT_OF_RESOURCES;
+      goto ON_ERROR;
+    }
+    Status = Ip4Cfg2->GetData (
+                        Ip4Cfg2,
+                        Ip4Config2DataTypeInterfaceInfo,
+                        &DataSize,
+                        IfInfo
+                        );
+
+    if (EFI_ERROR (Status)) {
+      goto ON_ERROR;
+    }
+    // if ((IfName != NULL) && (StrCmp (IfName, IfInfo->Name) != 0)) {
+    //   FreePool (IfInfo);
+    //   continue;
+    // }
+    // DataSize = 0;
+    // Status = Ip4Cfg2->GetData (
+    //                     Ip4Cfg2,
+    //                     Ip4Config2DataTypeDnsServer,
+    //                     &DataSize,
+    //                     NULL
+    //                     );
+    // if ((Status != EFI_BUFFER_TOO_SMALL) && (Status != EFI_NOT_FOUND)) {
+    //   goto ON_ERROR;
+    // }
+    // if (DataSize > 0) {
+    //   Status = Ip4Cfg2->GetData (
+    //                       Ip4Cfg2,
+    //                       Ip4Config2DataTypeDnsServer,
+    //                       &DataSize,
+    //                       IfCb->DnsAddr
+    //                       );
+    //   if (EFI_ERROR (Status)) {
+    //     goto ON_ERROR;
+    //   }
+    // }
+    // DataSize = sizeof (EFI_IP4_CONFIG2_POLICY);
+    // Status   = Ip4Cfg2->GetData (
+    //                       Ip4Cfg2,
+    //                       Ip4Config2DataTypePolicy,
+    //                       &DataSize,
+    //                       &IfCb->Policy
+    //                       );
+    // if (EFI_ERROR (Status)) {
+    //   goto ON_ERROR;
+    // }
+    // InsertTailList (IfList, &IfCb->Link);
+    // if ((IfName != NULL) && (StrCmp (IfName, IfInfo->Name) == 0)) {
+    //   //
+    //   // Only need the appointed interface, keep the allocated buffer.
+    //   //
+    //   IfCb   = NULL;
+    //   IfInfo = NULL;
+    //   break;
+    // }
+    ZeroMem (&ManualAddress, sizeof (ManualAddress));
+    ManualAddress.Address = ip4;
+    *(UINT32 *)ManualAddress.SubnetMask.Addr = (255 | 255 << 8 | 255 << 16 | 0 << 24);
+    *(UINT32 *)Gateway.Addr = ((ManualAddress.SubnetMask.Addr[0]&ip4.Addr[0]) | 
+                              (ManualAddress.SubnetMask.Addr[1]&ip4.Addr[1]) << 8 | 
+                              (ManualAddress.SubnetMask.Addr[2]&ip4.Addr[2]) << 16 | 1<< 24);
+    Policy = Ip4Config2PolicyStatic;
+    Status = Ip4Cfg2->SetData (
+                            Ip4Cfg2,
+                            Ip4Config2DataTypePolicy,
+                            sizeof (EFI_IP4_CONFIG2_POLICY),
+                            &Policy
+                            );
+    if (EFI_ERROR (Status)) {
+      goto ON_ERROR;
+    }
+    Status = gBS->CreateEvent (
+                  EVT_NOTIFY_SIGNAL,
+                  TPL_NOTIFY,
+                  IfConfigManualAddressNotify,
+                  &IsAddressOk,
+                  &MappedEvt
+                  );
+    Status = gBS->CreateEvent (
+                  EVT_TIMER,
+                  TPL_CALLBACK,
+                  NULL,
+                  NULL,
+                  &TimeOutEvt
+                  );
+    IsAddressOk = FALSE;
+
+    Status = Ip4Cfg2->RegisterDataNotify (
+                            Ip4Cfg2,
+                            Ip4Config2DataTypeManualAddress,
+                            MappedEvt
+                            );
+    if (EFI_ERROR (Status)) {
+      goto ON_ERROR;
+    }
+
+    DataSize = sizeof (EFI_IP4_CONFIG2_MANUAL_ADDRESS);
+
+    Status = Ip4Cfg2->SetData (
+                            Ip4Cfg2,
+                            Ip4Config2DataTypeManualAddress,
+                            DataSize,
+                            &ManualAddress
+                            );
+
+    if (Status == EFI_NOT_READY) {
+      gBS->SetTimer (TimeOutEvt, TimerRelative, 50000000);
+
+      while (EFI_ERROR (gBS->CheckEvent (TimeOutEvt))) {
+        if (IsAddressOk) {
+          Status = EFI_SUCCESS;
+          break;
+        }
+      }
+    }
+    Ip4Cfg2->UnregisterDataNotify (
+                     Ip4Cfg2,
+                     Ip4Config2DataTypeManualAddress,
+                     MappedEvt
+                     );
+
+    if (EFI_ERROR (Status)) {
+      goto ON_ERROR;
+    }
+    DataSize = sizeof (EFI_IPv4_ADDRESS);
+
+    Status = Ip4Cfg2->SetData (
+                            Ip4Cfg2,
+                            Ip4Config2DataTypeGateway,
+                            DataSize,
+                            &Gateway
+                            );
+    if (EFI_ERROR (Status)) {
+      goto ON_ERROR;
+    }
+  }
+
+  if (HandleBuffer != NULL) {
+    FreePool (HandleBuffer);
+  }
+
+  return EFI_SUCCESS;
+
+ON_ERROR:
+
+  if (IfInfo != NULL) {
+    FreePool (IfInfo);
+  }
+
+  return Status;
 }
 
 static void switch_event(lv_event_t * e)
