@@ -50,6 +50,7 @@ static bool button_is_pressed(uint8_t id);
  *  STATIC VARIABLES
  **********************/
 extern int32_t lv_disp_hor_res, lv_disp_ver_res;
+extern const lv_image_dsc_t normal_cursor;
 
 lv_indev_t * indev_touchpad;
 lv_indev_t * indev_mouse;
@@ -119,7 +120,8 @@ void lv_port_indev_init(void)
 
     /*Set cursor. For simplicity set a HOME symbol now.*/
     lv_obj_t * mouse_cursor = lv_image_create(lv_screen_active());
-    lv_image_set_src(mouse_cursor, LV_SYMBOL_HOME);
+    // lv_image_set_src(mouse_cursor, LV_SYMBOL_HOME);
+    lv_image_set_src(mouse_cursor, &normal_cursor);
     // lv_image_set_src(mouse_cursor, "S:/normal.png");  //Degrade performance
     lv_indev_set_cursor(indev_mouse, mouse_cursor);
     lv_indev_set_group(indev_mouse, indev_group);

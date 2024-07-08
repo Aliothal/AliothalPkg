@@ -20,7 +20,6 @@ lvgl theme用的是simple,有点简陋;默认是default,不好看
 
 #### Lvgl/NetAssist
 目前以实现udp4大部分功能  
-为什么要用两个udp protocol;因为UEFI的udp只有本机ip和子网掩码为0时才能接受广播(不好评价)  
 正常来说需要先有ip,才能通讯;但是UEFI未通过ifconfig设置ip的时候,也能通讯;设置成相同ip甚至能拦截发向这个ip的包(试过UDP4)  
 且只有真正设置了ip,才能切换config的ip,否则只能使用第一次config的ip
 

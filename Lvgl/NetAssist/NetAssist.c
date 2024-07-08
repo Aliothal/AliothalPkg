@@ -67,14 +67,14 @@ typedef struct {
 } lv_ui;
 
 lv_ui ui;
-static UDP4_SOCKET *gSocketReceive = NULL;
-static UDP4_SOCKET *gSocketTransmit = NULL;
+static UDP4_SOCKET *gSocket = NULL;
 static char debug_buf[2048];
 static char fragment_buf[2048];
 const char *ip4_station_str;
 const char *port_station_str;
 const char *ip4_remote_str;
 const char *port_remote_str;
+static lv_style_t style_title;
 
 static void lv_debug(lv_obj_t *ta, const char* format, ...){
   VA_LIST va;
@@ -87,15 +87,25 @@ static void lv_debug(lv_obj_t *ta, const char* format, ...){
   lv_textarea_add_text(ta, debug_buf);
 }
 
+static void lv_msgbox_modal(const char *title, const char *text)
+{
+  lv_obj_t * mbox = lv_msgbox_create(NULL);
+  lv_obj_set_size(mbox, 400, 200);
+  lv_obj_t *to = lv_msgbox_add_title(mbox, title);
+  lv_obj_t *header = lv_msgbox_get_header(mbox);
+  lv_obj_set_size(header, 400, 50);
+  lv_obj_add_style(to, &style_title, 0);
+  lv_msgbox_add_text(mbox, text);
+  lv_msgbox_add_close_button(mbox);
+}
+
 static void event_close(lv_event_t * e)
 {
   lv_point_t point;
   lv_indev_get_point(lv_event_get_indev(e), &point);
   if (lv_obj_hit_test(lv_event_get_target_obj(e), &point)) {
-    if (gSocketReceive)
-      CloseUdp4Socket(gSocketReceive);
-    if (gSocketTransmit)
-      CloseUdp4Socket(gSocketTransmit);
+    if (gSocket)
+      CloseUdp4Socket(gSocket);
     lv_timer_delete(ui.usage_timer);
     lv_obj_delete(ui.win_main);
     lv_efi_app_exit();
@@ -128,43 +138,66 @@ static void clr_log_event(lv_event_t * e)
   }
 }
 
-static void send_event(lv_event_t * e)
+static void action_send()
 {
   EFI_STATUS Status = 0;
-  lv_point_t point;
-  if (gSocketTransmit == NULL || !lv_obj_has_state(ui.setting.net.sw, LV_STATE_CHECKED))
+  const char *send_data = lv_textarea_get_text(ui.data.ctrl.ta_send);
+  lv_strncpy(fragment_buf, send_data, 2048);        //@note: necessary
+  UINTN send_len = lv_strlen(send_data);
+  if (send_len == 0)
     return;
+  EFI_IPv4_ADDRESS ip4_remote;
+  UINTN port_remote;
+  ip4_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_ip);
+  port_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_port);
+  if (NetLibAsciiStrToIp4(ip4_remote_str, &ip4_remote) != 0) {
+    return;
+  }
+  port_remote = AsciiStrDecimalToUintn(port_remote_str);
+  if (port_remote > 0xFFFF) {
+    lv_msgbox_modal("Warning", "Port exceeds maximum value");
+    return;
+  }
+  gSocket->ConfigData.RemoteAddress = ip4_remote;
+  gSocket->ConfigData.RemotePort = (UINT16)port_remote;
+  Status = gSocket->Udp4->Configure(gSocket->Udp4, NULL);
+  Status = gSocket->Udp4->Configure(gSocket->Udp4, &gSocket->ConfigData);
+  EFI_UDP4_TRANSMIT_DATA *TxData = gSocket->TokenTransmit.Packet.TxData;
+  ZeroMem(TxData, sizeof(EFI_UDP4_TRANSMIT_DATA));
+  TxData->DataLength = send_len;
+  TxData->FragmentCount = 1;
+  TxData->FragmentTable[0].FragmentLength = send_len;
+  TxData->FragmentTable[0].FragmentBuffer = (void *)fragment_buf;
+  Status = gSocket->Udp4->Transmit(gSocket->Udp4, &gSocket->TokenTransmit);         //@note: not block
+  lv_textarea_set_text(ui.data.ctrl.ta_send, "");                                                           //@note: may clean send_data before transmission is down
+  lv_debug(NULL, "%a\n", fragment_buf);
+}
+
+static void button_event_send(lv_event_t * e)
+{
+  lv_point_t point;
+  if (gSocket == NULL) {
+    lv_msgbox_modal("Error", "Network is not supported");
+    return;
+  }
+  if (!lv_obj_has_state(ui.setting.net.sw, LV_STATE_CHECKED)) {
+    lv_msgbox_modal("Warning", "Network is not connected");
+    return;
+  }
+
   lv_indev_get_point(lv_event_get_indev(e), &point);
   if (lv_obj_hit_test(lv_event_get_target_obj(e), &point)) {
-    const char *send_data = lv_textarea_get_text(ui.data.ctrl.ta_send);
-    lv_strncpy(fragment_buf, send_data, 2048);        //@note: necessary
-    UINTN send_len = lv_strlen(send_data);
-    if (send_len == 0)
-      return;
-    EFI_IPv4_ADDRESS ip4_remote;
-    UINTN port_remote;
-    ip4_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_ip);
-    port_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_port);
-    if (!NetLibAsciiStrToIp4(ip4_remote_str, &ip4_remote) == 0) {
-      return;
-    }
-    port_remote = AsciiStrDecimalToUintn(port_remote_str);
-    if (port_remote > 0xFFFF) {
-      return;
-    }
-    gSocketTransmit->ConfigData.RemoteAddress = ip4_remote;
-    gSocketTransmit->ConfigData.RemotePort = (UINT16)port_remote;
-    Status = gSocketTransmit->Udp4->Configure(gSocketTransmit->Udp4, NULL);
-    Status = gSocketTransmit->Udp4->Configure(gSocketTransmit->Udp4, &gSocketTransmit->ConfigData);
-    EFI_UDP4_TRANSMIT_DATA *TxData = gSocketTransmit->TokenTransmit.Packet.TxData;
-    ZeroMem(TxData, sizeof(EFI_UDP4_TRANSMIT_DATA));
-    TxData->DataLength = send_len;
-    TxData->FragmentCount = 1;
-    TxData->FragmentTable[0].FragmentLength = send_len;
-    TxData->FragmentTable[0].FragmentBuffer = (void *)fragment_buf;
-    Status = gSocketTransmit->Udp4->Transmit(gSocketTransmit->Udp4, &gSocketTransmit->TokenTransmit);         //@note: not block
-    lv_textarea_set_text(ui.data.ctrl.ta_send, "");                                                           //@note: may clean send_data before transmission is down
-    lv_debug(NULL, "%a\n", fragment_buf);
+    action_send();
+  }
+}
+static void enter_event_send(lv_event_t * e)
+{
+  if (gSocket == NULL) {
+    lv_msgbox_modal("Error", "Network is not supported");
+    return;
+  }
+  if (LV_KEY_ENTER == lv_event_get_key(e)) {
+    action_send();
   }
 }
 
@@ -393,42 +426,49 @@ ON_ERROR:
 static void switch_event(lv_event_t * e)
 {
   EFI_STATUS Status = 0;
-  if (gSocketReceive == NULL || gSocketTransmit == NULL) {
+  if (gSocket == NULL) {
+    lv_msgbox_modal("Error", "Network is not supported");
     return;
   }
   if (lv_obj_has_state(ui.setting.net.sw, LV_STATE_CHECKED)) {
     lv_obj_add_state(ui.setting.net.dd_type, LV_STATE_DISABLED);
     lv_obj_add_state(ui.setting.net.ta_ip, LV_STATE_DISABLED);
     lv_obj_add_state(ui.setting.net.ta_port, LV_STATE_DISABLED);
-    EFI_IPv4_ADDRESS ip4_station;
-    UINTN port_station;
+    EFI_IPv4_ADDRESS ip4_station, ip4_remote;
+    UINTN port_station, port_remote;
     ip4_station_str = lv_textarea_get_text(ui.setting.net.ta_ip);
     port_station_str = lv_textarea_get_text(ui.setting.net.ta_port);
-    if (!NetLibAsciiStrToIp4(ip4_station_str, &ip4_station) == 0) {
+    ip4_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_ip);
+    port_remote_str = lv_textarea_get_text(ui.data.conf.ta_re_port);
+    if ((NetLibAsciiStrToIp4(ip4_station_str, &ip4_station) != 0) || (NetLibAsciiStrToIp4(ip4_remote_str, &ip4_remote) != 0)) {
+      lv_msgbox_modal("Warning", "Ip is incorrect");
       return;
     }
     port_station = AsciiStrDecimalToUintn(port_station_str);
-    if (port_station > 0xFFFF) {
+    port_remote = AsciiStrDecimalToUintn(port_remote_str);
+    if (port_station > 0xFFFF || port_remote > 0xFFFF) {
+      lv_msgbox_modal("Warning", "Port exceeds maximum value");
       return;
     }
+  
     lv_set_ip(ip4_station);
     switch (lv_dropdown_get_selected(ui.setting.net.dd_type)) {
       case 0:   //Udp
-        gSocketTransmit->ConfigData.StationAddress = ip4_station;
-        gSocketTransmit->ConfigData.StationPort = (UINT16)port_station;
-        gSocketReceive->ConfigData.StationPort = (UINT16)port_station;
+        gSocket->ConfigData.StationAddress = ip4_station;
+        gSocket->ConfigData.StationPort = (UINT16)port_station;
+        gSocket->ConfigData.RemoteAddress = ip4_remote;
+        gSocket->ConfigData.RemotePort = (UINT16)port_remote;
         
-        Status = gSocketReceive->Udp4->Configure(gSocketReceive->Udp4, NULL);
-        Status = gSocketReceive->Udp4->Configure(gSocketReceive->Udp4, &gSocketReceive->ConfigData);
-        Status = gSocketReceive->Udp4->Receive(gSocketReceive->Udp4, &gSocketReceive->TokenReceive);
+        Status = gSocket->Udp4->Configure(gSocket->Udp4, NULL);
+        Status = gSocket->Udp4->Configure(gSocket->Udp4, &gSocket->ConfigData);
+        Status = gSocket->Udp4->Receive(gSocket->Udp4, &gSocket->TokenReceive);
         break;
     }
   } else {
     lv_obj_remove_state(ui.setting.net.dd_type, LV_STATE_DISABLED);
     lv_obj_remove_state(ui.setting.net.ta_ip, LV_STATE_DISABLED);
     lv_obj_remove_state(ui.setting.net.ta_port, LV_STATE_DISABLED);
-    gSocketReceive->Udp4->Cancel(gSocketReceive->Udp4, NULL);
-    gSocketTransmit->Udp4->Cancel(gSocketTransmit->Udp4, NULL);
+    gSocket->Udp4->Cancel(gSocket->Udp4, NULL);
   }
 }
 
@@ -471,20 +511,18 @@ EFI_STATUS UdpInit(void)
                           0,      // ReceiveTimeout
                           0,      // TransmitTimeout
                           FALSE,  // UseDefaultAddress
-                          {{0, 0, 0, 0}},  // StationAddress
-                          {{0, 0, 0, 0}},  // SubnetMask
+                          {{192, 168, 1, 20}},  // StationAddress
+                          {{255, 255, 255, 0}},  // SubnetMask
                           5566,      // StationPort
-                          {{0, 0, 0, 0}},  // RemoteAddress
-                          0,      // RemotePort
+                          {{192, 168, 1, 12}},  // RemoteAddress
+                          5566,      // RemotePort
     };
 
-    Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4ReceiveHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketReceive);
-    *(UINT32 *)mConfigData.StationAddress.Addr = (192 | 168 << 8 | 1 << 16 | 20 << 24);
-    *(UINT32 *)mConfigData.SubnetMask.Addr = (255 | 255 << 8 | 255 << 16 | 0 << 24);
-    *(UINT32 *)mConfigData.RemoteAddress.Addr = (192 | 168 << 8 | 1 << 16 | 10 << 24);
-    mConfigData.RemotePort = mConfigData.StationPort;
-    Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4NullHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocketTransmit);
+    Status = CreateUdp4Socket(&mConfigData, (EFI_EVENT_NOTIFY)Udp4ReceiveHandler, (EFI_EVENT_NOTIFY)Udp4NullHandler, &gSocket);
 
+    if (gSocket == NULL) {
+      lv_msgbox_modal("Error", "Network is not supported");
+    }
     return Status;
 }
 
@@ -516,7 +554,6 @@ void lv_efi_app_main(void)
   lv_obj_set_flex_flow(ui.content, LV_FLEX_FLOW_ROW);
 
   ui.setting.this = lv_obj_create(ui.content);
-  static lv_style_t style_title;
   lv_style_init(&style_title);
   lv_style_set_text_color(&style_title, lv_color_hex(0xff0000));
   
@@ -615,7 +652,7 @@ void lv_efi_app_main(void)
   lv_textarea_set_accepted_chars(ui.data.conf.ta_re_ip, "0123456789.");
   lv_textarea_set_one_line(ui.data.conf.ta_re_ip, true);
   lv_textarea_set_max_length(ui.data.conf.ta_re_ip, 15);
-  lv_textarea_set_text(ui.data.conf.ta_re_ip, "192.168.1.10");
+  lv_textarea_set_text(ui.data.conf.ta_re_ip, "192.168.1.12");
 
   ui.data.conf.lb_re_port = lv_label_create(ui.data.conf.this);
   lv_label_set_text(ui.data.conf.lb_re_port, "  Remote port:");
@@ -649,10 +686,11 @@ void lv_efi_app_main(void)
   lv_obj_set_size(ui.data.ctrl.ta_send, LV_PCT(90), LV_PCT(100));
   lv_obj_set_style_border_width(ui.data.ctrl.ta_send, 1, 0);
   lv_obj_set_style_border_color(ui.data.ctrl.ta_send, lv_color_make(120,120,120), 0);
+  // lv_obj_add_event_cb(ui.data.ctrl.ta_send, enter_event_send, LV_EVENT_KEY, NULL);
 
   ui.data.ctrl.btn_send = lv_button_create(ui.data.ctrl.this);
   lv_obj_add_style(ui.data.ctrl.btn_send, &ui.btn_cls_clicked, LV_STATE_PRESSED);
-  lv_obj_add_event_cb(ui.data.ctrl.btn_send, send_event, LV_EVENT_RELEASED, NULL);
+  lv_obj_add_event_cb(ui.data.ctrl.btn_send, button_event_send, LV_EVENT_RELEASED, NULL);
   // lv_obj_set_size(ui.data.ctrl.btn_send,)
   ui.data.ctrl.lb_send = lv_label_create(ui.data.ctrl.btn_send);
   lv_label_set_text(ui.data.ctrl.lb_send, "send");
