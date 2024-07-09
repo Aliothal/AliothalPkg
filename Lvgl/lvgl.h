@@ -30,6 +30,7 @@ extern "C" {
 #include <Library/MemoryAllocationLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/TimerLib.h>
+#include <Library/PrintLib.h>
 
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/SimplePointer.h>

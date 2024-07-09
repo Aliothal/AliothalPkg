@@ -324,6 +324,7 @@
   TimerLib
   Udp4SocketLib
   NetLib
+  PrintLib
 
 [Protocols]
   gEfiGraphicsOutputProtocolGuid

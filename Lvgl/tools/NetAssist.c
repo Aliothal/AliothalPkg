@@ -53,7 +53,7 @@ typedef struct {
 typedef struct {
 	lv_obj_t *win_main;
   lv_obj_t *header;
-  lv_obj_t *usage;
+  lv_obj_t *usage_cpu;
   lv_obj_t *time;
   lv_timer_t *usage_timer;
 	lv_obj_t *btn_cls;
@@ -115,7 +115,7 @@ static void show_usage(lv_timer_t * t)
 {
   EFI_TIME time;
   gRT->GetTime(&time, NULL);
-  lv_label_set_text_fmt(ui.usage, "Usage: %3d%%", (100 - lv_timer_get_idle()));
+  lv_label_set_text_fmt(ui.usage_cpu, "Lvgl cpu usage: %3d%%", (100 - lv_timer_get_idle()));
   lv_label_set_text_fmt(ui.time, "Time: %4d/%2d/%2d-%2d:%2d:%2d", time.Year, time.Month, time.Day, time.Hour, time.Minute, time.Second);
 }
 
@@ -533,7 +533,7 @@ void lv_efi_app_main(void)
   ui.win_main = lv_win_create(lv_screen_active());
   lv_win_add_title(ui.win_main, "NetAssist");
   ui.header = lv_win_get_header(ui.win_main);
-  ui.usage = lv_label_create(ui.header);
+  ui.usage_cpu = lv_label_create(ui.header);
   ui.time = lv_label_create(ui.header);
 
   ui.usage_timer = lv_timer_create(show_usage, 500, NULL);
