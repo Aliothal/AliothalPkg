@@ -1,7 +1,7 @@
 import os
 import time
 
-efi_name = "/MyPrint.efi"
+efi_name = "\\MyPrint.efi"
 struct_line = 32
 
 efi_path = os.path.dirname(os.path.abspath(__file__)) + efi_name

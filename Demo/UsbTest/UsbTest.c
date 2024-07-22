@@ -47,6 +47,9 @@ VOID ShowUsbIoInfo()
       Status = UsbIo->UsbGetStringDescriptor(UsbIo, LangIDTable[i], UsbDeviceDescriptor.StrProduct, &ProductStr);
       Status = UsbIo->UsbGetStringDescriptor(UsbIo, LangIDTable[i], UsbDeviceDescriptor.StrSerialNumber, &SerialNumberStr);
       Print(L"LangId 0x%x, ManufacturerStr:%s, ProductStr:%s, SerialNumberStr:%s\n", LangIDTable[i], ManufacturerStr, ProductStr, SerialNumberStr);
+      FreePool(ManufacturerStr);
+      FreePool(ProductStr);
+      FreePool(SerialNumberStr);
     }
 
     EFI_USB_INTERFACE_DESCRIPTOR InterfaceDescriptor;

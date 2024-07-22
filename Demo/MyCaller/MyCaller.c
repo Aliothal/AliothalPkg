@@ -9,7 +9,16 @@
 
 #include <Protocol/ShellParameters.h>
 #include <Protocol/LoadedImage.h>
+#include <Protocol/UsbIo.h>
+#include <Guid/FileInfo.h>
 #include "EfiBinary.h"
+
+#define SHELL_1_SUPPORT
+
+#ifdef SHELL_1_SUPPORT
+#include <Protocol/EfiShellInterface.h>
+#include <Protocol/EfiShellEnvironment2.h>
+#endif
 
 static EFI_STATUS
 TrimSpaces (
@@ -285,6 +294,10 @@ EfiBinaryExecute (
 {
   EFI_STATUS Status = 0;
   EFI_SHELL_PARAMETERS_PROTOCOL ShellParamsProtocol;
+#ifdef SHELL_1_SUPPORT
+  EFI_SHELL_INTERFACE ShellInterface;
+  EFI_SHELL_ENVIRONMENT2 ShellEnv2;
+#endif
   CHAR16 *NewCmdLine = NULL;
   EFI_HANDLE NewHandle;
   EFI_LOADED_IMAGE_PROTOCOL *LoadedImage;
@@ -337,6 +350,20 @@ EfiBinaryExecute (
     }
     Status = gBS->InstallProtocolInterface (&NewHandle, &gEfiShellParametersProtocolGuid, EFI_NATIVE_INTERFACE, &ShellParamsProtocol);
 
+#ifdef SHELL_1_SUPPORT
+    ZeroMem (&ShellInterface, sizeof (EFI_SHELL_INTERFACE));
+    ZeroMem (&ShellEnv2, sizeof (EFI_SHELL_ENVIRONMENT2));
+    ShellEnv2.SESGuid = gEfiShellEnvironment2ExtGuid;
+    ShellEnv2.MajorVersion = EFI_SHELL_MAJOR_VER;
+    ShellEnv2.MinorVersion = EFI_SHELL_MINOR_VER;
+    Status = ParseCommandLineToArgs (NewCmdLine, TRUE, &(ShellInterface.Argv), &(ShellInterface.Argc));
+    if (EFI_ERROR (Status)) {
+      goto UnloadImage;
+    }
+    Status = gBS->InstallProtocolInterface (&NewHandle, &gEfiShellInterfaceGuid, EFI_NATIVE_INTERFACE, &ShellInterface);
+    Status = gBS->InstallProtocolInterface (&NewHandle, &gEfiShellEnvironment2Guid, EFI_NATIVE_INTERFACE, &ShellEnv2);
+#endif
+
     if (!EFI_ERROR (Status)) {
       StartStatus = gBS->StartImage (
                            NewHandle,
@@ -352,6 +379,18 @@ EfiBinaryExecute (
                              &gEfiShellParametersProtocolGuid,
                              &ShellParamsProtocol
                              );
+#ifdef SHELL_1_SUPPORT
+      Status = gBS->UninstallProtocolInterface (
+                             NewHandle,
+                             &gEfiShellInterfaceGuid,
+                             &ShellInterface
+                             );
+      Status = gBS->UninstallProtocolInterface (
+                             NewHandle,
+                             &gEfiShellEnvironment2Guid,
+                             &ShellEnv2
+                             );
+#endif
       goto FreeAlloc;
     }
 
@@ -365,6 +404,14 @@ FreeAlloc:
       }
       FreePool (ShellParamsProtocol.Argv);
     }
+#ifdef SHELL_1_SUPPORT
+    if (ShellInterface.Argv != NULL) {
+      for (UINTN i = 0; i < ShellInterface.Argc; i++) {
+        FreePool (ShellInterface.Argv[i]);
+      }
+      FreePool (ShellInterface.Argv);
+    }
+#endif
   }
   FreePool (NewCmdLine);
   return Status;
@@ -379,21 +426,80 @@ MyCallerEntryPoint (
 {
   EFI_STATUS  Status = EFI_SUCCESS;
 
-  // UINTN MyNum = 0;
-  // EFI_HANDLE  *MyFsHandle = NULL;
-  // EFI_DEVICE_PATH_PROTOCOL  *MyPath;
-  // gBS->LocateHandleBuffer(ByProtocol, &gEfiSimpleFileSystemProtocolGuid, NULL, &MyNum, &MyFsHandle);
-  // for (UINTN i = 0; i < MyNum; i++) {
-  //   // Determine which U disk by USB Io
-  //   // todo
-  //   MyPath = FileDevicePath(MyFsHandle[i], EfiName);
-  //   Status = MyExecute(MyPath, L"MyPrint.efi asdf qwer zxcv", NULL, 0, NULL);
-  // }
-  // if(MyFsHandle) {
-  //   FreePool(MyFsHandle);
-  // }
+  UINTN MyNum = 0;
+  EFI_HANDLE  *MyFsHandle = NULL;
+  EFI_USB_IO_PROTOCOL *UsbIo;
+  Status = gBS->LocateHandleBuffer(ByProtocol, &gEfiSimpleFileSystemProtocolGuid, NULL, &MyNum, &MyFsHandle);
+  for (UINTN i = 0; i < MyNum; i++) {
+    // Determine which U disk by USB Io
+    // todo
+    Status = gBS->HandleProtocol(MyFsHandle[i], &gEfiUsbIoProtocolGuid, &UsbIo);
+    if (Status) {
+      continue;
+    }
+    EFI_USB_DEVICE_DESCRIPTOR   DevDsc;
+    Status = UsbIo->UsbGetDeviceDescriptor(UsbIo, &DevDsc);
+    if (Status || DevDsc.IdVendor != 0x781 || DevDsc.IdProduct != 0x5591) {
+      continue;
+    }
+    EFI_USB_INTERFACE_DESCRIPTOR InfDsc;
+    Status = UsbIo->UsbGetInterfaceDescriptor(UsbIo, &InfDsc);
+    if (Status || InfDsc.InterfaceClass != USB_MASS_STORE_CLASS || InfDsc.InterfaceSubClass != USB_MASS_STORE_SCSI) {
+      continue;
+    }
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs0;
+    EFI_FILE_PROTOCOL *root;
+    EFI_FILE_PROTOCOL *file;
+    Status = gBS->HandleProtocol(MyFsHandle[i], &gEfiSimpleFileSystemProtocolGuid, &Fs0);
+    AsciiPrint("gBS->HandleProtocol status :%r\n", Status);
+    Status = Fs0->OpenVolume(Fs0, &root);
+    AsciiPrint("Fs0->OpenVolume status :%r\n", Status);
+    Status = root->Open(root, &file, L"\\aaa.txt", EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE, 0);
+    AsciiPrint("root->Open status :%r\n", Status);
+    UINTN BufferSize = 8;
+    CHAR8 Buffer[9];
+    UINT64 Position;
+    Status = file->Read(file, &BufferSize, Buffer);
+    file->GetPosition(file, &Position);
+    Buffer[8]=0;
+    AsciiPrint("file->Read status :%r, size:%d, position:%d\ncontent:%a\n", Status, BufferSize, Position, Buffer);
+    BufferSize = 5;
+    Buffer[0] = '1';
+    file->Write(file, &BufferSize, Buffer);
+    file->Close(file);
+    root->Close(root);
+    
+    // EFI_DEVICE_PATH_PROTOCOL  *MyPath;
+    // MyPath = FileDevicePath(MyFsHandle[i], L"\\aaa.txt");
+    // EFI_FILE_HANDLE confh;
+    // UINTN BufferSize = 0;
+    // CHAR8 *Buffer;
+    // Status = EfiOpenFileByDevicePath(&MyPath, &confh, EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE, 0);
+    // Status = confh->Read(confh, &BufferSize, Buffer);
+    // AsciiPrint("read status :%r BufferSize:%d\n", Status, BufferSize);
+    // if (Status != EFI_BUFFER_TOO_SMALL) {
+    //   return 0;
+    // }
+    // Buffer = AllocatePool(BufferSize);
+    // Status = confh->Read(confh, &BufferSize, Buffer);
+    // AsciiPrint("%a\n", Buffer);
+    // UINT64 Position;
+    // Status = confh->GetPosition(confh, &Position);
+    // AsciiPrint("P:%d\n", Position);
+  
+    // Status = EfiBinaryExecute(MyPath, L"MyPrint.efi asdf qwer zxcv", NULL, 0, NULL);
+    // FreePool(MyPath);
+    // FreePool(Buffer);
+    // confh->Close(confh);
+  }
+  if(MyFsHandle) {
+    FreePool(MyFsHandle);
+  }
 
-  Status = EfiBinaryExecute(NULL, L"SceEfi64.efi /i /ms \"Memory Frequency\" /lang en-US /qv 0x1D", EfiBinary, sizeof(EfiBinary), NULL);
 
+  // Status = EfiBinaryExecute(NULL, L"MyPrint.efi", EfiBinary, sizeof(EfiBinary), NULL);
+
+  // gBS->Stall(10000000);
+  
   return Status;
 }

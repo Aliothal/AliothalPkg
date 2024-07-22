@@ -28,3 +28,12 @@
 
 [Protocols]
   gEfiLoadedImageProtocolGuid
+  gEfiShellParametersProtocolGuid
+  gEfiSimpleFileSystemProtocolGuid
+  gEfiUsbIoProtocolGuid
+  gEfiShellInterfaceGuid
+  gEfiShellEnvironment2Guid
+
+[Guids]
+  gEfiShellEnvironment2ExtGuid
+  gEfiFileInfoGuid
