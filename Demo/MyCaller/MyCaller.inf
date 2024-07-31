@@ -30,6 +30,7 @@
   gEfiLoadedImageProtocolGuid
   gEfiShellParametersProtocolGuid
   gEfiSimpleFileSystemProtocolGuid
+  gEfiSimpleTextOutProtocolGuid
   gEfiUsbIoProtocolGuid
   gEfiShellInterfaceGuid
   gEfiShellEnvironment2Guid

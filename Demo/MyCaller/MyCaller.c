@@ -10,6 +10,7 @@
 #include <Protocol/ShellParameters.h>
 #include <Protocol/LoadedImage.h>
 #include <Protocol/UsbIo.h>
+#include <Protocol/SimpleTextOut.h>
 #include <Guid/FileInfo.h>
 #include "EfiBinary.h"
 
@@ -417,6 +418,175 @@ FreeAlloc:
   return Status;
 }
 
+typedef struct {
+  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL    NewSimpleTextOut;
+  EFI_HANDLE                         NewHandle;
+  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL    *OrgSimpleTextOut;
+  EFI_HANDLE                         OrgHandle;
+} NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutReset (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This,
+  IN  BOOLEAN                          ExtendedVerification
+  )
+{
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->Reset(((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut, ExtendedVerification);
+}
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutTestString (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This,
+  IN  CHAR16                           *String
+  )
+{
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->TestString(((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut, String);
+}
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutQueryMode (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This,
+  IN  UINTN                            ModeNumber,
+  OUT UINTN                            *Columns,
+  OUT UINTN                            *Rows
+  )
+{
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->QueryMode(
+                              ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut,
+                              ModeNumber,
+                              Columns,
+                              Rows
+                              );
+}
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutSetMode (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This,
+  IN  UINTN                            ModeNumber
+  )
+{
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->SetMode(((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut, ModeNumber);
+}
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutSetAttribute (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This,
+  IN  UINTN                            Attribute
+  )
+{
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->SetAttribute(((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut, Attribute);
+}
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutClearScreen (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This
+  )
+{
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->ClearScreen(((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut);
+}
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutSetCursorPosition (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This,
+  IN  UINTN                            Column,
+  IN  UINTN                            Row
+  )
+{
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->SetCursorPosition(((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut, Column, Row);
+}
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutEnableCursor (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This,
+  IN  BOOLEAN                          Visible
+  )
+{
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->EnableCursor(((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut, Visible);
+}
+
+EFI_STATUS
+EFIAPI
+NewSimpleTextOutOutputString (
+  IN  EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL  *This,
+  IN  CHAR16                           *String
+  )
+{
+  gBS->Stall(5000000);
+  return ((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut->OutputString(((NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL*)This)->OrgSimpleTextOut, String);
+}
+
+NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *InstallNewStdOut()
+{
+  EFI_STATUS Status;
+  NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *NewStdOut = AllocateZeroPool(sizeof(NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL));
+  NewStdOut->OrgHandle = gST->ConsoleOutHandle;
+  NewStdOut->OrgSimpleTextOut = gST->ConOut;
+  NewStdOut->NewHandle = gImageHandle;
+  NewStdOut->NewSimpleTextOut.Reset             = NewSimpleTextOutReset;
+  NewStdOut->NewSimpleTextOut.TestString        = NewSimpleTextOutTestString;
+  NewStdOut->NewSimpleTextOut.QueryMode         = NewSimpleTextOutQueryMode;
+  NewStdOut->NewSimpleTextOut.SetMode           = NewSimpleTextOutSetMode;
+  NewStdOut->NewSimpleTextOut.SetAttribute      = NewSimpleTextOutSetAttribute;
+  NewStdOut->NewSimpleTextOut.ClearScreen       = NewSimpleTextOutClearScreen;
+  NewStdOut->NewSimpleTextOut.SetCursorPosition = NewSimpleTextOutSetCursorPosition;
+  NewStdOut->NewSimpleTextOut.EnableCursor      = NewSimpleTextOutEnableCursor;
+  NewStdOut->NewSimpleTextOut.OutputString      = NewSimpleTextOutOutputString;
+  NewStdOut->NewSimpleTextOut.Mode              = AllocateCopyPool(sizeof(EFI_SIMPLE_TEXT_OUTPUT_MODE), NewStdOut->OrgSimpleTextOut->Mode);
+
+  Status = gBS->InstallProtocolInterface(
+                  &(NewStdOut->NewHandle),
+                  &gEfiSimpleTextOutProtocolGuid,
+                  EFI_NATIVE_INTERFACE,
+                  &(NewStdOut->NewSimpleTextOut)
+                  );
+
+  if (!EFI_ERROR (Status)) {
+    gST->ConsoleOutHandle = NewStdOut->NewHandle;
+    gST->ConOut = &NewStdOut->NewSimpleTextOut;
+    gST->Hdr.CRC32 = 0;
+    gBS->CalculateCrc32 (
+          (UINT8 *)&gST->Hdr,
+          gST->Hdr.HeaderSize,
+          &gST->Hdr.CRC32
+         );
+    return NewStdOut;
+  } else {
+    if (NewStdOut->NewSimpleTextOut.Mode != NULL) {
+      FreePool(NewStdOut->NewSimpleTextOut.Mode);
+      NewStdOut->NewSimpleTextOut.Mode = NULL;
+    }
+    if (NewStdOut != NULL) {
+      FreePool(NewStdOut);
+      NewStdOut = NULL;
+    }
+    return NULL;
+  }
+}
+
+EFI_STATUS UninstallNewStdOut(NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *NewStdOut)
+{
+  EFI_STATUS Status;
+  gST->ConsoleOutHandle = NewStdOut->OrgHandle;
+  gST->ConOut = NewStdOut->OrgSimpleTextOut;
+  gST->Hdr.CRC32 = 0;
+  gBS->CalculateCrc32 (
+        (UINT8 *)&gST->Hdr,
+        gST->Hdr.HeaderSize,
+        &gST->Hdr.CRC32
+        );
+  Status = gBS->UninstallProtocolInterface(NewStdOut->NewHandle, &gEfiSimpleTextOutProtocolGuid, (VOID *)&NewStdOut->NewSimpleTextOut);
+  FreePool(NewStdOut->NewSimpleTextOut.Mode);
+  FreePool(NewStdOut);
+  return Status;
+}
 
 EFI_STATUS
 MyCallerEntryPoint (
@@ -426,48 +596,46 @@ MyCallerEntryPoint (
 {
   EFI_STATUS  Status = EFI_SUCCESS;
 
-  UINTN MyNum = 0;
-  EFI_HANDLE  *MyFsHandle = NULL;
-  EFI_USB_IO_PROTOCOL *UsbIo;
-  Status = gBS->LocateHandleBuffer(ByProtocol, &gEfiSimpleFileSystemProtocolGuid, NULL, &MyNum, &MyFsHandle);
-  for (UINTN i = 0; i < MyNum; i++) {
-    // Determine which U disk by USB Io
-    // todo
-    Status = gBS->HandleProtocol(MyFsHandle[i], &gEfiUsbIoProtocolGuid, &UsbIo);
-    if (Status) {
-      continue;
-    }
-    EFI_USB_DEVICE_DESCRIPTOR   DevDsc;
-    Status = UsbIo->UsbGetDeviceDescriptor(UsbIo, &DevDsc);
-    if (Status || DevDsc.IdVendor != 0x781 || DevDsc.IdProduct != 0x5591) {
-      continue;
-    }
-    EFI_USB_INTERFACE_DESCRIPTOR InfDsc;
-    Status = UsbIo->UsbGetInterfaceDescriptor(UsbIo, &InfDsc);
-    if (Status || InfDsc.InterfaceClass != USB_MASS_STORE_CLASS || InfDsc.InterfaceSubClass != USB_MASS_STORE_SCSI) {
-      continue;
-    }
-    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs0;
-    EFI_FILE_PROTOCOL *root;
-    EFI_FILE_PROTOCOL *file;
-    Status = gBS->HandleProtocol(MyFsHandle[i], &gEfiSimpleFileSystemProtocolGuid, &Fs0);
-    AsciiPrint("gBS->HandleProtocol status :%r\n", Status);
-    Status = Fs0->OpenVolume(Fs0, &root);
-    AsciiPrint("Fs0->OpenVolume status :%r\n", Status);
-    Status = root->Open(root, &file, L"\\aaa.txt", EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE, 0);
-    AsciiPrint("root->Open status :%r\n", Status);
-    UINTN BufferSize = 8;
-    CHAR8 Buffer[9];
-    UINT64 Position;
-    Status = file->Read(file, &BufferSize, Buffer);
-    file->GetPosition(file, &Position);
-    Buffer[8]=0;
-    AsciiPrint("file->Read status :%r, size:%d, position:%d\ncontent:%a\n", Status, BufferSize, Position, Buffer);
-    BufferSize = 5;
-    Buffer[0] = '1';
-    file->Write(file, &BufferSize, Buffer);
-    file->Close(file);
-    root->Close(root);
+  // UINTN MyNum = 0;
+  // EFI_HANDLE  *MyFsHandle = NULL;
+  // EFI_USB_IO_PROTOCOL *UsbIo;
+  // Status = gBS->LocateHandleBuffer(ByProtocol, &gEfiSimpleFileSystemProtocolGuid, NULL, &MyNum, &MyFsHandle);
+  // for (UINTN i = 0; i < MyNum; i++) {
+  //   Status = gBS->HandleProtocol(MyFsHandle[i], &gEfiUsbIoProtocolGuid, &UsbIo);
+  //   if (Status) {
+  //     continue;
+  //   }
+  //   EFI_USB_DEVICE_DESCRIPTOR   DevDsc;
+  //   Status = UsbIo->UsbGetDeviceDescriptor(UsbIo, &DevDsc);
+  //   if (Status || DevDsc.IdVendor != 0x781 || DevDsc.IdProduct != 0x5591) {
+  //     continue;
+  //   }
+  //   EFI_USB_INTERFACE_DESCRIPTOR InfDsc;
+  //   Status = UsbIo->UsbGetInterfaceDescriptor(UsbIo, &InfDsc);
+  //   if (Status || InfDsc.InterfaceClass != USB_MASS_STORE_CLASS || InfDsc.InterfaceSubClass != USB_MASS_STORE_SCSI) {
+  //     continue;
+  //   }
+  //   EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs0;
+  //   EFI_FILE_PROTOCOL *root;
+  //   EFI_FILE_PROTOCOL *file;
+  //   Status = gBS->HandleProtocol(MyFsHandle[i], &gEfiSimpleFileSystemProtocolGuid, &Fs0);
+  //   AsciiPrint("gBS->HandleProtocol status :%r\n", Status);
+  //   Status = Fs0->OpenVolume(Fs0, &root);
+  //   AsciiPrint("Fs0->OpenVolume status :%r\n", Status);
+  //   Status = root->Open(root, &file, L"\\aaa.txt", EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE, 0);
+  //   AsciiPrint("root->Open status :%r\n", Status);
+  //   UINTN BufferSize = 8;
+  //   CHAR8 Buffer[9];
+  //   UINT64 Position;
+  //   Status = file->Read(file, &BufferSize, Buffer);
+  //   file->GetPosition(file, &Position);
+  //   Buffer[8]=0;
+  //   AsciiPrint("file->Read status :%r, size:%d, position:%d\ncontent:%a\n", Status, BufferSize, Position, Buffer);
+  //   BufferSize = 5;
+  //   Buffer[0] = '1';
+  //   file->Write(file, &BufferSize, Buffer);
+  //   file->Close(file);
+  //   root->Close(root);
     
     // EFI_DEVICE_PATH_PROTOCOL  *MyPath;
     // MyPath = FileDevicePath(MyFsHandle[i], L"\\aaa.txt");
@@ -491,13 +659,17 @@ MyCallerEntryPoint (
     // FreePool(MyPath);
     // FreePool(Buffer);
     // confh->Close(confh);
-  }
-  if(MyFsHandle) {
-    FreePool(MyFsHandle);
-  }
+  // }
+  // if(MyFsHandle) {
+  //   FreePool(MyFsHandle);
+  // }
 
 
-  // Status = EfiBinaryExecute(NULL, L"MyPrint.efi", EfiBinary, sizeof(EfiBinary), NULL);
+  NEW_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *NewStd = InstallNewStdOut();
+  Status = EfiBinaryExecute(NULL, L"MyPrint.efi", EfiBinary, sizeof(EfiBinary), NULL);
+  if (NewStd != NULL) {
+    UninstallNewStdOut(NewStd);
+  }
 
   // gBS->Stall(10000000);
   
